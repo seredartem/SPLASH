@@ -11,9 +11,12 @@ class ClassBase(BaseModel):
 class ClassCreate(ClassBase):
     pass
 
-
-class ClassUpdate(ClassBase):
-    pass
+class ClassUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    level: str | None = None
+    duration_minutes: int | None = None
+    is_active: bool | None = None
 
 class ClassResponse(ClassBase):
     model_config = ConfigDict(from_attributes=True)
