@@ -4,11 +4,13 @@ from app.database import engine
 from app.routers.auth import router as auth_router
 from app.routers.classes import router as classes_router
 from app.routers.trainers import router as trainers_router
+from app.routers.schedule import router as schedule_router
 
 app = FastAPI(title='Splash API')
 app.include_router(auth_router)
 app.include_router(classes_router)
 app.include_router(trainers_router)
+app.include_router(schedule_router)
 
 @app.get("/health")
 def health_check():
