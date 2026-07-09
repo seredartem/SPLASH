@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
-from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse, AdminBookingDetailResponse
+from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse, AdminBookingDetailResponse, BookingStatusUpdate
 from app.dependencies.auth import get_current_admin, get_current_user
 from app.models.user import User
 from app.models.booking import Booking
@@ -91,6 +91,23 @@ async def get_admin_booking_details(db: AsyncSession = Depends(get_db), current_
     result = await db.execute(statement)
     booking_details = result.mappings().all()
     return booking_details
+
+@router.patch("/admin/{booking_id}/status", response_model=BookingResponse)
+async def update_booking_status(booking_data: BookingStatusUpdate, booking_id: int,db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    statement = select(Booking).where(Booking.id==booking_id)
+    result = await db.execute(statement)
+    booking = result.scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Not found")
+    allowed_status = ["booked","cancelled","attended","no_show"]
+    
+    if booking_data.status not in allowed_status:
+        raise HTTPException(status_code=400, detail="Invalid booking status")
+    
+    booking.status = booking_data.status
+    await db.commit()
+    await db.refresh(booking)
+    return booking
 
 @router.get("/details", response_model=list[BookingDetailResponse])
 async def get_booking_details(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
