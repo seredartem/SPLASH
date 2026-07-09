@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
-from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse
+from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse, AdminBookingDetailResponse
 from app.dependencies.auth import get_current_admin, get_current_user
 from app.models.user import User
 from app.models.booking import Booking
@@ -58,6 +58,33 @@ async def get_all_bookings(db: AsyncSession = Depends(get_db), current_admin: Us
     result = await db.execute(statement)
     bookings = result.scalars().all()
     return bookings
+
+@router.get("/admin/details", response_model=list[AdminBookingDetailResponse])
+async def get_admin_booking_details(db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    statement = select(
+        Booking.id,
+        Booking.user_id,
+        User.name.label("user_name"),
+        User.email.label("user_email"),
+        Booking.schedule_id,
+        Booking.status,
+        Booking.created_at,
+        Schedule.class_id,
+        ClassModel.title.label("class_title"),
+        Schedule.trainer_id,
+        Trainer.name.label("trainer_name"),
+        Schedule.date,
+        Schedule.start_time,
+        Schedule.end_time
+    ).join(User, User.id == Booking.user_id
+    ).join(Schedule, Schedule.id == Booking.schedule_id
+    ).join(ClassModel, ClassModel.id == Schedule.class_id
+    ).join(Trainer, Trainer.id == Schedule.trainer_id
+    ).order_by(Schedule.date, Schedule.start_time, Booking.created_at)
+
+    result = await db.execute(statement)
+    booking_details = result.mappings().all()
+    return booking_details
 
 @router.get("/details", response_model=list[BookingDetailResponse])
 async def get_booking_details(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
