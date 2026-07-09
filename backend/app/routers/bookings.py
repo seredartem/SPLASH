@@ -9,6 +9,7 @@ from app.models.booking import Booking
 from app.models.schedule import Schedule
 from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
+from datetime import datetime
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -21,6 +22,11 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    schedule_start = datetime.combine(schedule.date, schedule.start_time)
+
+    if schedule_start <= datetime.now():
+        raise HTTPException(status_code=400, detail="Cannot book a past schedule")
     
     if schedule.is_active == False:
         raise HTTPException(status_code=400, detail="Cannot book an inactive schedule")
