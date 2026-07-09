@@ -10,6 +10,7 @@ from app.models.schedule import Schedule
 from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
 from datetime import datetime
+from app.constants import ALLOWED_BOOKING_STATUSES, BOOKING_STATUS_BOOKED, BOOKING_STATUS_CANCELLED
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -18,7 +19,7 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
     statement = select(Schedule).where(Schedule.id == booking_data.schedule_id)
     result = await db.execute(statement)
     schedule = result.scalar_one_or_none()
-    existing_booking = await db.execute(select(Booking).where(Booking.user_id == current_user.id, Booking.schedule_id == booking_data.schedule_id, Booking.status == "booked"))
+    existing_booking = await db.execute(select(Booking).where(Booking.user_id == current_user.id, Booking.schedule_id == booking_data.schedule_id, Booking.status == BOOKING_STATUS_BOOKED))
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -34,7 +35,7 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
     if existing_booking.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You have already booked this schedule")
     
-    statement = select(func.count(Booking.id)).where(Booking.schedule_id == booking_data.schedule_id, Booking.status == "booked")
+    statement = select(func.count(Booking.id)).where(Booking.schedule_id == booking_data.schedule_id, Booking.status == BOOKING_STATUS_BOOKED)
     result = await db.execute(statement)
     booked_count = result.scalar()
     if booked_count >= schedule.max_places:
@@ -43,7 +44,7 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
     new_booking = Booking(
         user_id=current_user.id,
         schedule_id=booking_data.schedule_id,
-        status="booked"
+        status=BOOKING_STATUS_BOOKED
     )
 
     db.add(new_booking)
@@ -99,9 +100,8 @@ async def update_booking_status(booking_data: BookingStatusUpdate, booking_id: i
     booking = result.scalar_one_or_none()
     if not booking:
         raise HTTPException(status_code=404, detail="Not found")
-    allowed_status = ["booked","cancelled","attended","no_show"]
     
-    if booking_data.status not in allowed_status:
+    if booking_data.status not in ALLOWED_BOOKING_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid booking status")
     
     booking.status = booking_data.status
@@ -151,7 +151,7 @@ async def get_active_bookings(db: AsyncSession = Depends(get_db), current_user: 
     ).join(Schedule, Schedule.id == Booking.schedule_id
     ).join(ClassModel, ClassModel.id == Schedule.class_id
     ).join(Trainer, Trainer.id == Schedule.trainer_id
-    ).where(Booking.user_id == current_user.id, Booking.status == "booked").order_by(Schedule.date, Schedule.start_time)
+    ).where(Booking.user_id == current_user.id, Booking.status == BOOKING_STATUS_BOOKED).order_by(Schedule.date, Schedule.start_time)
 
     result = await db.execute(statement)
     booking_details = result.mappings().all()
@@ -174,7 +174,7 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    if booking.status == "cancelled":
+    if booking.status == BOOKING_STATUS_CANCELLED:
         raise HTTPException(status_code=400, detail="Booking is already cancelled")
     
     statement = select(Schedule).where(Schedule.id == booking.schedule_id)
@@ -189,7 +189,7 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     if schedule_start <= datetime.now():
         raise HTTPException(status_code=400, detail="Cannot cancel a booking after schedule has started")
 
-    booking.status = "cancelled"
+    booking.status = BOOKING_STATUS_CANCELLED
     await db.commit()
     await db.refresh(booking)
     return booking
