@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
-from app.schemas.booking import BookingCreate, BookingResponse
-from app.models.booking import Booking
-from app.models.schedule import Schedule
+from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse
 from app.dependencies.auth import get_current_admin, get_current_user
 from app.models.user import User
+from app.models.booking import Booking
+from app.models.schedule import Schedule
+from app.models.trainers import Trainer
+from app.models.class_model import ClassModel
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -56,6 +58,54 @@ async def get_all_bookings(db: AsyncSession = Depends(get_db), current_admin: Us
     result = await db.execute(statement)
     bookings = result.scalars().all()
     return bookings
+
+@router.get("/details", response_model=list[BookingDetailResponse])
+async def get_booking_details(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # helper
+    statement = select(
+        Booking.id,
+        Booking.schedule_id,
+        Booking.status,
+        Booking.created_at,
+        Schedule.class_id,
+        ClassModel.title.label("class_title"),
+        Schedule.trainer_id,
+        Trainer.name.label("trainer_name"),
+        Schedule.date,
+        Schedule.start_time,
+        Schedule.end_time
+    ).join(Schedule, Schedule.id == Booking.schedule_id
+    ).join(ClassModel, ClassModel.id == Schedule.class_id
+    ).join(Trainer, Trainer.id == Schedule.trainer_id
+    ).where(Booking.user_id == current_user.id).order_by(Schedule.date, Schedule.start_time)
+
+    result = await db.execute(statement)
+    booking_details = result.mappings().all()
+    return booking_details
+
+@router.get("/active", response_model=list[BookingDetailResponse])
+async def get_active_bookings(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # helper 
+    statement = select(
+        Booking.id,
+        Booking.schedule_id,
+        Booking.status,
+        Booking.created_at,
+        Schedule.class_id,
+        ClassModel.title.label("class_title"),
+        Schedule.trainer_id,
+        Trainer.name.label("trainer_name"),
+        Schedule.date,
+        Schedule.start_time,
+        Schedule.end_time
+    ).join(Schedule, Schedule.id == Booking.schedule_id
+    ).join(ClassModel, ClassModel.id == Schedule.class_id
+    ).join(Trainer, Trainer.id == Schedule.trainer_id
+    ).where(Booking.user_id == current_user.id, Booking.status == "booked").order_by(Schedule.date, Schedule.start_time)
+
+    result = await db.execute(statement)
+    booking_details = result.mappings().all()
+    return booking_details
 
 @router.get("/{booking_id}", response_model=BookingResponse)
 async def get_booking(booking_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
