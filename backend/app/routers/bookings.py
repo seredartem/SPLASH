@@ -156,9 +156,21 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     booking = result.scalar_one_or_none()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    
+
     if booking.status == "cancelled":
         raise HTTPException(status_code=400, detail="Booking is already cancelled")
+    
+    statement = select(Schedule).where(Schedule.id == booking.schedule_id)
+    result = await db.execute(statement)
+    schedule = result.scalar_one_or_none()
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    schedule_start = datetime.combine(schedule.date, schedule.start_time)
+
+    if schedule_start <= datetime.now():
+        raise HTTPException(status_code=400, detail="Cannot cancel a booking after schedule has started")
 
     booking.status = "cancelled"
     await db.commit()
