@@ -151,6 +151,9 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
+    if booking.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Booking is already cancelled")
+
     booking.status = "cancelled"
     await db.commit()
     await db.refresh(booking)
