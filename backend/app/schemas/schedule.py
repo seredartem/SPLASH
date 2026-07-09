@@ -27,3 +27,22 @@ class ScheduleResponse(ScheduleBase):
     id: int
     created_at: datetime
 
+class ScheduleDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    class_id: int
+    class_title: str
+
+    trainer_id: int
+    trainer_name: str
+
+    date: DateType
+    start_time: TimeType
+    end_time: TimeType
+
+    max_places: int
+    booked_places: int
+    available_places: int
+
+    is_active: bool
+    created_at: datetime
