@@ -111,23 +111,7 @@ async def update_booking_status(booking_data: BookingStatusUpdate, booking_id: i
 
 @router.get("/details", response_model=list[BookingDetailResponse])
 async def get_booking_details(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # helper
-    statement = select(
-        Booking.id,
-        Booking.schedule_id,
-        Booking.status,
-        Booking.created_at,
-        Schedule.class_id,
-        ClassModel.title.label("class_title"),
-        Schedule.trainer_id,
-        Trainer.name.label("trainer_name"),
-        Schedule.date,
-        Schedule.start_time,
-        Schedule.end_time
-    ).join(Schedule, Schedule.id == Booking.schedule_id
-    ).join(ClassModel, ClassModel.id == Schedule.class_id
-    ).join(Trainer, Trainer.id == Schedule.trainer_id
-    ).where(Booking.user_id == current_user.id).order_by(Schedule.date, Schedule.start_time)
+    statement = booking_details_base_query().where(Booking.user_id == current_user.id).order_by(Schedule.date, Schedule.start_time)
 
     result = await db.execute(statement)
     booking_details = result.mappings().all()
@@ -135,23 +119,7 @@ async def get_booking_details(db: AsyncSession = Depends(get_db), current_user: 
 
 @router.get("/active", response_model=list[BookingDetailResponse])
 async def get_active_bookings(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # helper 
-    statement = select(
-        Booking.id,
-        Booking.schedule_id,
-        Booking.status,
-        Booking.created_at,
-        Schedule.class_id,
-        ClassModel.title.label("class_title"),
-        Schedule.trainer_id,
-        Trainer.name.label("trainer_name"),
-        Schedule.date,
-        Schedule.start_time,
-        Schedule.end_time
-    ).join(Schedule, Schedule.id == Booking.schedule_id
-    ).join(ClassModel, ClassModel.id == Schedule.class_id
-    ).join(Trainer, Trainer.id == Schedule.trainer_id
-    ).where(Booking.user_id == current_user.id, Booking.status == BOOKING_STATUS_BOOKED).order_by(Schedule.date, Schedule.start_time)
+    statement = booking_details_base_query().where(Booking.user_id == current_user.id, Booking.status == BOOKING_STATUS_BOOKED).order_by(Schedule.date, Schedule.start_time)
 
     result = await db.execute(statement)
     booking_details = result.mappings().all()
@@ -193,3 +161,21 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     await db.commit()
     await db.refresh(booking)
     return booking
+
+
+def booking_details_base_query():
+    return select(
+        Booking.id,
+        Booking.schedule_id,
+        Booking.status,
+        Booking.created_at,
+        Schedule.class_id,
+        ClassModel.title.label("class_title"),
+        Schedule.trainer_id,
+        Trainer.name.label("trainer_name"),
+        Schedule.date,
+        Schedule.start_time,
+        Schedule.end_time
+    ).join(Schedule, Schedule.id == Booking.schedule_id
+    ).join(ClassModel, ClassModel.id == Schedule.class_id
+    ).join(Trainer, Trainer.id == Schedule.trainer_id)
