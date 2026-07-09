@@ -5,7 +5,7 @@ from app.database import get_db
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.models.booking import Booking
 from app.models.schedule import Schedule
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_admin, get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -46,6 +46,13 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
 @router.get("/", response_model=list[BookingResponse])
 async def get_user_bookings(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     statement = select(Booking).where(Booking.user_id == current_user.id)
+    result = await db.execute(statement)
+    bookings = result.scalars().all()
+    return bookings
+
+@router.get("/admin/all", response_model=list[BookingResponse])
+async def get_all_bookings(db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    statement = select(Booking).order_by(Booking.created_at)
     result = await db.execute(statement)
     bookings = result.scalars().all()
     return bookings
