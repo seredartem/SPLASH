@@ -10,11 +10,17 @@ from app.models.user import User
 router = APIRouter(prefix="/classes", tags=["classes"])
 
 @router.get("/", response_model=list[ClassResponse])
-async def get_lesson(db: AsyncSession = Depends(get_db)):
-    statement = select(ClassModel).where(ClassModel.is_active == True)
+async def get_lesson(page: int = 1,limit: int = 10,is_active: bool | None = True,db: AsyncSession = Depends(get_db),):
+    offset = (page - 1) * limit
+    statement = select(ClassModel)
+    
+    if is_active is not None:
+        statement = statement.where(ClassModel.is_active == is_active)
+
+    statement = statement.order_by(ClassModel.id).offset(offset).limit(limit)
     result = await db.execute(statement)
-    lessons = result.scalars()
-    return lessons.all()
+    classes = result.scalars().all()
+    return classes
 
 @router.post("/", response_model=ClassResponse)
 async def add_lessons(class_data: ClassCreate, db: AsyncSession=Depends(get_db), current_admin: User = Depends(get_current_admin)):

@@ -14,6 +14,23 @@ from app.constants import ALLOWED_BOOKING_STATUSES, BOOKING_STATUS_BOOKED, BOOKI
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
+def booking_details_base_query():
+    return select(
+        Booking.id,
+        Booking.schedule_id,
+        Booking.status,
+        Booking.created_at,
+        Schedule.class_id,
+        ClassModel.title.label("class_title"),
+        Schedule.trainer_id,
+        Trainer.name.label("trainer_name"),
+        Schedule.date,
+        Schedule.start_time,
+        Schedule.end_time
+    ).join(Schedule, Schedule.id == Booking.schedule_id
+    ).join(ClassModel, ClassModel.id == Schedule.class_id
+    ).join(Trainer, Trainer.id == Schedule.trainer_id)
+
 @router.post("/", response_model=BookingResponse)
 async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     statement = select(Schedule).where(Schedule.id == booking_data.schedule_id)
@@ -52,6 +69,8 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
     await db.refresh(new_booking)
     return new_booking
 
+# пагинация (limit, page) + фильтрация (active / not active) 
+
 @router.get("/", response_model=list[BookingResponse])
 async def get_user_bookings(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     statement = select(Booking).where(Booking.user_id == current_user.id)
@@ -59,6 +78,7 @@ async def get_user_bookings(db: AsyncSession = Depends(get_db), current_user: Us
     bookings = result.scalars().all()
     return bookings
 
+# параметры лимит и пейдж
 @router.get("/admin/all", response_model=list[BookingResponse])
 async def get_all_bookings(db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
     statement = select(Booking).order_by(Booking.created_at)
@@ -161,21 +181,3 @@ async def cancel_booking(booking_id: int, db: AsyncSession = Depends(get_db), cu
     await db.commit()
     await db.refresh(booking)
     return booking
-
-
-def booking_details_base_query():
-    return select(
-        Booking.id,
-        Booking.schedule_id,
-        Booking.status,
-        Booking.created_at,
-        Schedule.class_id,
-        ClassModel.title.label("class_title"),
-        Schedule.trainer_id,
-        Trainer.name.label("trainer_name"),
-        Schedule.date,
-        Schedule.start_time,
-        Schedule.end_time
-    ).join(Schedule, Schedule.id == Booking.schedule_id
-    ).join(ClassModel, ClassModel.id == Schedule.class_id
-    ).join(Trainer, Trainer.id == Schedule.trainer_id)

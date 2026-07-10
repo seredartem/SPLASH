@@ -27,6 +27,8 @@ class ScheduleResponse(ScheduleBase):
     id: int
     created_at: datetime
 
+
+# наследовать от шедулбейз
 class ScheduleDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

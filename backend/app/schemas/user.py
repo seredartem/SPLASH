@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
 
+
+# сделать бзербейз под почту и пароль
 class UserCreate(BaseModel):
     name: str   
     email: EmailStr
