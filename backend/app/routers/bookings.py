@@ -84,7 +84,7 @@ async def get_user_bookings(page: int = 1, limit: int = 10, status: str | None =
 
 # параметры лимит и пейдж
 @router.get("/admin/all", response_model=list[BookingResponse])
-async def get_all_bookings(page: int = 1, limit: int = 10, status: str | None = None,db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+async def get_all_bookings(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
     offset = (page - 1) * limit
     statement = select(Booking)
     if status is not None:
@@ -96,7 +96,7 @@ async def get_all_bookings(page: int = 1, limit: int = 10, status: str | None = 
     return bookings
 
 @router.get("/admin/details", response_model=list[AdminBookingDetailResponse])
-async def get_admin_booking_details(db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+async def get_admin_booking_details(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
     statement = select(
         Booking.id,
         Booking.user_id,
