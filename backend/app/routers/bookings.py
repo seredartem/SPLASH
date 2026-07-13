@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database import get_db
 from app.schemas.booking import BookingCreate, BookingResponse, BookingDetailResponse, AdminBookingDetailResponse, BookingStatusUpdate
 from app.dependencies.auth import get_current_admin, get_current_user
+from app.dependencies.pagination import get_offset
 from app.models.user import User
 from app.models.booking import Booking
 from app.models.schedule import Schedule
@@ -70,8 +71,8 @@ async def create_booking(booking_data: BookingCreate, db: AsyncSession = Depends
     return new_booking
 
 @router.get("/", response_model=list[BookingResponse])
-async def get_user_bookings(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    offset = (page - 1) * limit
+async def get_user_bookings(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), status: str | None = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    offset = get_offset(page, limit)
     statement = select(Booking).where(Booking.user_id == current_user.id)
 
     if status is not None:
@@ -82,10 +83,9 @@ async def get_user_bookings(page: int = 1, limit: int = 10, status: str | None =
     bookings = result.scalars().all()
     return bookings
 
-# параметры лимит и пейдж
 @router.get("/admin/all", response_model=list[BookingResponse])
-async def get_all_bookings(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
-    offset = (page - 1) * limit
+async def get_all_bookings(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    offset = get_offset(page, limit)
     statement = select(Booking)
     if status is not None:
         statement = statement.where(Booking.status == status)
@@ -96,7 +96,8 @@ async def get_all_bookings(page: int = 1, limit: int = 10, status: str | None = 
     return bookings
 
 @router.get("/admin/details", response_model=list[AdminBookingDetailResponse])
-async def get_admin_booking_details(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+async def get_admin_booking_details(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), status: str | None = None, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    offset = get_offset(page, limit)
     statement = select(
         Booking.id,
         Booking.user_id,
@@ -115,9 +116,17 @@ async def get_admin_booking_details(page: int = 1, limit: int = 10, status: str 
     ).join(User, User.id == Booking.user_id
     ).join(Schedule, Schedule.id == Booking.schedule_id
     ).join(ClassModel, ClassModel.id == Schedule.class_id
-    ).join(Trainer, Trainer.id == Schedule.trainer_id
-    ).order_by(Schedule.date, Schedule.start_time, Booking.created_at)
+    ).join(Trainer, Trainer.id == Schedule.trainer_id)
 
+
+    if status is not None:
+        statement = statement.where(Booking.status == status)
+
+    statement = statement.order_by(
+        Schedule.date,
+        Schedule.start_time,
+        Booking.created_at
+    ).offset(offset).limit(limit)
     result = await db.execute(statement)
     booking_details = result.mappings().all()
     return booking_details
@@ -139,8 +148,8 @@ async def update_booking_status(booking_data: BookingStatusUpdate, booking_id: i
     return booking
 
 @router.get("/details", response_model=list[BookingDetailResponse])
-async def get_booking_details(page: int = 1, limit: int = 10, status: str | None = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    offset = (page - 1) * limit
+async def get_booking_details(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), status: str | None = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    offset = get_offset(page, limit)
     statement = booking_details_base_query().where(Booking.user_id == current_user.id)
     if status is not None:
         statement = statement.where(Booking.status == status)
@@ -150,8 +159,8 @@ async def get_booking_details(page: int = 1, limit: int = 10, status: str | None
     return booking_details
 
 @router.get("/active", response_model=list[BookingDetailResponse])
-async def get_active_bookings(page: int = 1, limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    offset = (page - 1) * limit
+async def get_active_bookings(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    offset = get_offset(page, limit)
     statement = booking_details_base_query().where(Booking.user_id == current_user.id, Booking.status == BOOKING_STATUS_BOOKED).order_by(Schedule.date, Schedule.start_time).offset(offset).limit(limit)
     result = await db.execute(statement)
     booking_details = result.mappings().all()
