@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from app.database import get_db
 from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleUpdate, ScheduleDetailResponse
 from app.dependencies.auth import get_current_admin
+from app.dependencies.pagination import get_offset
 from app.models.user import User
 from app.models.schedule import Schedule
 from app.models.booking import Booking
@@ -13,10 +14,9 @@ from app.constants import BOOKING_STATUS_BOOKED
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
-# pagination
 @router.get("/", response_model=list[ScheduleResponse])
-async def get_schedules(page: int = 1,limit: int = 10, is_active: bool | None = True, db: AsyncSession = Depends(get_db)):
-    offset = (page - 1) * limit
+async def get_schedules(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), is_active: bool | None = True, db: AsyncSession = Depends(get_db)):
+    offset = get_offset(page, limit)
     statement = select(Schedule)
 
     if is_active is not None:
@@ -36,8 +36,8 @@ async def add_schedule(schedule_data: ScheduleCreate, db: AsyncSession = Depends
     return new_schedule
 
 @router.get("/details", response_model=list[ScheduleDetailResponse])
-async def get_schedule_details(page: int = 1, limit: int = 10, is_active: bool | None = True, db: AsyncSession = Depends(get_db)):
-    offset = (page - 1) * limit
+async def get_schedule_details(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100), is_active: bool | None = True, db: AsyncSession = Depends(get_db)):
+    offset = get_offset(page, limit)
     statement = select(
         Schedule.id,
         Schedule.class_id,

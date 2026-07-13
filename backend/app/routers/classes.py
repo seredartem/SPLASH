@@ -1,17 +1,18 @@
-from fastapi import Depends, APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models.class_model import ClassModel
 from app.schemas.class_schemas import ClassResponse, ClassCreate, ClassUpdate
 from app.dependencies.auth import get_current_admin
+from app.dependencies.pagination import get_offset
 from app.models.user import User
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
 @router.get("/", response_model=list[ClassResponse])
-async def get_lesson(page: int = 1,limit: int = 10,is_active: bool | None = True,db: AsyncSession = Depends(get_db),):
-    offset = (page - 1) * limit
+async def get_lesson(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),is_active: bool | None = True,db: AsyncSession = Depends(get_db),):
+    offset = get_offset(page, limit)
     statement = select(ClassModel)
     
     if is_active is not None:
