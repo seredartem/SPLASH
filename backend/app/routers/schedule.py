@@ -29,6 +29,46 @@ async def get_schedules(page: int = Query(1, ge=1), limit: int = Query(10, ge=1,
 
 @router.post("/", response_model=ScheduleResponse)
 async def add_schedule(schedule_data: ScheduleCreate, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
+    if schedule_data.start_time >= schedule_data.end_time:
+        raise HTTPException(
+            status_code=400,
+            detail="End time must be later than start time"
+        )
+    statement = select(ClassModel).where(
+    ClassModel.id == schedule_data.class_id
+    )
+    result = await db.execute(statement)
+    class_item = result.scalar_one_or_none()
+
+    if class_item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Class not found"
+        )
+
+    if not class_item.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot schedule an inactive class"
+        )
+    
+    statement = select(Trainer).where(
+    Trainer.id == schedule_data.trainer_id
+    )
+    result = await db.execute(statement)
+    trainer = result.scalar_one_or_none()
+    if trainer is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Trainer not found"
+        )
+
+    if not trainer.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot schedule an inactive trainer"
+        )
+    
     new_schedule = Schedule(**schedule_data.model_dump())
     db.add(new_schedule)
     await db.commit()
@@ -74,7 +114,60 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
     schedule = result.scalar_one_or_none()
 
     if not schedule:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Schedule not found"
+        )
+    
+    updated_start_time = (
+    schedule_data.start_time
+    if schedule_data.start_time is not None
+    else schedule.start_time
+)
+
+    updated_end_time = (
+        schedule_data.end_time
+        if schedule_data.end_time is not None
+        else schedule.end_time
+    )
+
+    if updated_start_time >= updated_end_time:
+        raise HTTPException(
+            status_code=400,
+            detail="End time must be later than start time"
+        )
+    
+    if schedule_data.class_id is not None:
+        statement = select(ClassModel).where(
+            ClassModel.id == schedule_data.class_id
+        )
+        result = await db.execute(statement)
+        class_item = result.scalar_one_or_none()
+
+        if class_item is None:
+            raise HTTPException(status_code=404, detail="Class not found")
+
+        if not class_item.is_active:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot schedule an inactive class"
+            )
+    
+    if schedule_data.trainer_id is not None:
+        statement = select(Trainer).where(
+            Trainer.id == schedule_data.trainer_id
+        )
+        result = await db.execute(statement)
+        trainer = result.scalar_one_or_none()
+
+        if trainer is None:
+            raise HTTPException(status_code=404, detail="Trainer not found")
+
+        if not trainer.is_active:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot schedule an inactive trainer"
+            )
 
     for key, value in schedule_data.model_dump(exclude_unset=True).items():
         setattr(schedule, key, value)

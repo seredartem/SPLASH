@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import date as DateType, time as TimeType, datetime
 
 class ScheduleBase(BaseModel):
@@ -7,7 +7,7 @@ class ScheduleBase(BaseModel):
     class_id: int
     trainer_id: int
     date: DateType
-    max_places: int
+    max_places: int = Field(gt=0)
     is_active: bool = True
 
 class ScheduleCreate(ScheduleBase):
@@ -19,7 +19,7 @@ class ScheduleUpdate(BaseModel):
     date: DateType | None = None
     start_time: TimeType | None = None
     end_time: TimeType | None = None
-    max_places: int | None = None
+    max_places: int | None = Field(default=None, gt=0)
     is_active: bool | None = None
 
 class ScheduleResponse(ScheduleBase):
@@ -29,22 +29,8 @@ class ScheduleResponse(ScheduleBase):
 
 
 # наследовать от шедулбейз
-class ScheduleDetailResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    class_id: int
+class ScheduleDetailResponse(ScheduleResponse):
     class_title: str
-
-    trainer_id: int
     trainer_name: str
-
-    date: DateType
-    start_time: TimeType
-    end_time: TimeType
-
-    max_places: int
     booked_places: int
     available_places: int
-
-    is_active: bool
-    created_at: datetime
