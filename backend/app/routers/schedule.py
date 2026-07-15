@@ -11,6 +11,7 @@ from app.models.booking import Booking
 from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
 from app.constants import BOOKING_STATUS_BOOKED
+from datetime import datetime
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -34,6 +35,17 @@ async def add_schedule(schedule_data: ScheduleCreate, db: AsyncSession = Depends
             status_code=400,
             detail="End time must be later than start time"
         )
+    schedule_start = datetime.combine(
+        schedule_data.date,
+        schedule_data.start_time
+    )
+
+    if schedule_start <= datetime.now():
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot create a schedule in the past"
+        )        
+
     statement = select(ClassModel).where(
     ClassModel.id == schedule_data.class_id
     )
@@ -118,7 +130,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
             status_code=404,
             detail="Schedule not found"
         )
-    
+
     updated_start_time = (
         schedule_data.start_time
         if schedule_data.start_time is not None
@@ -136,6 +148,26 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
             status_code=400,
             detail="End time must be later than start time"
         )
+    
+    updated_date = (
+        schedule_data.date
+        if schedule_data.date is not None
+        else schedule.date
+    )
+    updated_schedule_start = datetime.combine(
+        updated_date,
+        updated_start_time
+    )
+
+    if (
+        schedule_data.date is not None
+        or schedule_data.start_time is not None
+    ):
+        if updated_schedule_start <= datetime.now():
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot move a schedule to the past"
+            )
     
     if schedule_data.class_id is not None:
         statement = select(ClassModel).where(
