@@ -201,9 +201,29 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
                 detail="Cannot schedule an inactive trainer"
             )
         
+    booking_sensitive_changes = (
+        (
+            schedule_data.class_id is not None
+            and schedule_data.class_id != schedule.class_id
+        ) or (
+            schedule_data.trainer_id is not None
+            and schedule_data.trainer_id != schedule.trainer_id
+        ) or (
+            schedule_data.date is not None
+            and schedule_data.date != schedule.date
+        ) or (
+            schedule_data.start_time is not None
+            and schedule_data.start_time != schedule.start_time
+        ) or (
+            schedule_data.end_time is not None
+            and schedule_data.end_time != schedule.end_time
+        )
+    )
+        
     should_check_bookings = (
         schedule_data.max_places is not None
         or schedule_data.is_active is False
+        or booking_sensitive_changes
     )
 
     booked_count = 0
@@ -215,6 +235,8 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
         )
         result = await db.execute(statement)
         booked_count = result.scalar()
+    if booked_count > 0 and booking_sensitive_changes:
+        raise HTTPException(status_code=400, detail="Cannot change schedule details with active bookings")
 
     if (
         schedule_data.max_places is not None
