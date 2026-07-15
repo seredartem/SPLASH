@@ -120,10 +120,10 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
         )
     
     updated_start_time = (
-    schedule_data.start_time
-    if schedule_data.start_time is not None
-    else schedule.start_time
-)
+        schedule_data.start_time
+        if schedule_data.start_time is not None
+        else schedule.start_time
+    )
 
     updated_end_time = (
         schedule_data.end_time
@@ -167,6 +167,23 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
             raise HTTPException(
                 status_code=400,
                 detail="Cannot schedule an inactive trainer"
+            )
+        
+    if schedule_data.max_places is not None:
+        statement = select(func.count(Booking.id)).where(
+            Booking.schedule_id == schedule.id,
+            Booking.status == BOOKING_STATUS_BOOKED
+        )
+        result = await db.execute(statement)
+        booked_count = result.scalar()
+
+        if schedule_data.max_places < booked_count:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Max places cannot be lower than "
+                    "the number of active bookings"
+                )
             )
 
     for key, value in schedule_data.model_dump(exclude_unset=True).items():
