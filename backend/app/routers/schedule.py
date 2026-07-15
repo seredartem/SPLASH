@@ -23,7 +23,7 @@ async def get_schedules(page: int = Query(1, ge=1), limit: int = Query(10, ge=1,
     if is_active is not None:
         statement = statement.where(Schedule.is_active == is_active)
 
-    statement = statement.order_by(Schedule.date, Schedule.start_time).offset(offset).limit(limit)
+    statement = statement.order_by(Schedule.date, Schedule.start_time, Schedule.id).offset(offset).limit(limit)
     result = await db.execute(statement)
     schedules = result.scalars().all()
     return schedules
@@ -112,7 +112,7 @@ async def get_schedule_details(page: int = Query(1, ge=1), limit: int = Query(10
         statement = statement.where(Schedule.is_active == is_active)
 
     statement = statement.group_by(Schedule.id, Schedule.class_id, ClassModel.title, Schedule.trainer_id, Trainer.name, Schedule.date, Schedule.start_time, Schedule.end_time, Schedule.max_places, Schedule.is_active, Schedule.created_at
-    ).order_by(Schedule.date, Schedule.start_time)
+    ).order_by(Schedule.date, Schedule.start_time, Schedule.id)
 
     statement = statement.offset(offset).limit(limit)
     result = await db.execute(statement)
@@ -233,6 +233,19 @@ async def delete_schedule(schedule_id: int, db: AsyncSession = Depends(get_db), 
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Not found")
+    
+    statement = select(func.count(Booking.id)).where(
+    Booking.schedule_id == schedule.id,
+    Booking.status == BOOKING_STATUS_BOOKED
+    )
+    result = await db.execute(statement)
+    booked_count = result.scalar()
+
+    if booked_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot deactivate schedule with active bookings"
+        )
 
     schedule.is_active = False
     await db.commit()
