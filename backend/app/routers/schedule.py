@@ -256,7 +256,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
             detail="Cannot deactivate schedule with active bookings"
         )
 
-    for key, value in schedule_data.model_dump(exclude_unset=True).items():
+    for key, value in schedule_data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(schedule, key, value)
 
     await db.commit()
