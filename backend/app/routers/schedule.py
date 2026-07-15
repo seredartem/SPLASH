@@ -201,7 +201,14 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
                 detail="Cannot schedule an inactive trainer"
             )
         
-    if schedule_data.max_places is not None:
+    should_check_bookings = (
+        schedule_data.max_places is not None
+        or schedule_data.is_active is False
+    )
+
+    booked_count = 0
+
+    if should_check_bookings:
         statement = select(func.count(Booking.id)).where(
             Booking.schedule_id == schedule.id,
             Booking.status == BOOKING_STATUS_BOOKED
@@ -209,14 +216,23 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
         result = await db.execute(statement)
         booked_count = result.scalar()
 
-        if schedule_data.max_places < booked_count:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Max places cannot be lower than "
-                    "the number of active bookings"
-                )
+    if (
+        schedule_data.max_places is not None
+        and schedule_data.max_places < booked_count
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Max places cannot be lower than "
+                "the number of active bookings"
             )
+        )
+
+    if schedule_data.is_active is False and booked_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot deactivate schedule with active bookings"
+        )
 
     for key, value in schedule_data.model_dump(exclude_unset=True).items():
         setattr(schedule, key, value)
