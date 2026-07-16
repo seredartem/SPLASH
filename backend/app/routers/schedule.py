@@ -12,7 +12,7 @@ from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
 from app.constants import BOOKING_STATUS_BOOKED
 from datetime import datetime
-from app.services.schedule import count_active_bookings, get_active_class
+from app.services.schedule import count_active_bookings, get_active_class, get_active_trainer
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -48,23 +48,7 @@ async def add_schedule(schedule_data: ScheduleCreate, db: AsyncSession = Depends
         )        
 
     await get_active_class(db, schedule_data.class_id)
-
-    statement = select(Trainer).where(
-    Trainer.id == schedule_data.trainer_id
-    )
-    result = await db.execute(statement)
-    trainer = result.scalar_one_or_none()
-    if trainer is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Trainer not found"
-        )
-
-    if not trainer.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot schedule an inactive trainer"
-        )
+    await get_active_trainer(db, schedule_data.trainer_id)
     
     new_schedule = Schedule(**schedule_data.model_dump())
     db.add(new_schedule)
@@ -158,20 +142,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
         await get_active_class(db, schedule_data.class_id)
     
     if schedule_data.trainer_id is not None:
-        statement = select(Trainer).where(
-            Trainer.id == schedule_data.trainer_id
-        )
-        result = await db.execute(statement)
-        trainer = result.scalar_one_or_none()
-
-        if trainer is None:
-            raise HTTPException(status_code=404, detail="Trainer not found")
-
-        if not trainer.is_active:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot schedule an inactive trainer"
-            )
+        await get_active_trainer(db, schedule_data.trainer_id)
         
     booking_sensitive_changes = (
         (

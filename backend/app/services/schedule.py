@@ -2,9 +2,9 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.booking import Booking
+from app.models.trainers import Trainer
 from app.constants import BOOKING_STATUS_BOOKED
 from app.models.class_model import ClassModel
-
 
 async def count_active_bookings(db: AsyncSession, schedule_id: int) -> int:
     count = func.count(Booking.id)
@@ -19,9 +19,20 @@ async def get_active_class(db: AsyncSession, class_id: int) -> ClassModel:
     active_class = result.scalar_one_or_none()
 
     if active_class is None:
-        raise HTTPException(status_code=404, detail=("Class not found"))
+        raise HTTPException(status_code=404, detail="Class not found")
     
     if not active_class.is_active:
         raise HTTPException(status_code=400, detail="Cannot schedule an inactive class")
-    
     return active_class
+
+async def get_active_trainer(db: AsyncSession, trainer_id: int) -> Trainer:
+    statement = select(Trainer).where(Trainer.id == trainer_id)
+    result = await db.execute(statement)
+    active_trainer = result.scalar_one_or_none()
+
+    if active_trainer is None:
+        raise HTTPException(status_code=404, detail="Trainer not found")
+    
+    if not active_trainer.is_active:
+        raise HTTPException(status_code=400, detail="Cannot schedule an inactive trainer")
+    return active_trainer
