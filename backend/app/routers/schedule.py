@@ -12,6 +12,7 @@ from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
 from app.constants import BOOKING_STATUS_BOOKED
 from datetime import datetime
+from app.services.schedule import count_active_bookings
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -229,12 +230,8 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
     booked_count = 0
 
     if should_check_bookings:
-        statement = select(func.count(Booking.id)).where(
-            Booking.schedule_id == schedule.id,
-            Booking.status == BOOKING_STATUS_BOOKED
-        )
-        result = await db.execute(statement)
-        booked_count = result.scalar()
+        booked_count = await count_active_bookings(db, schedule.id)
+
     if booked_count > 0 and booking_sensitive_changes:
         raise HTTPException(status_code=400, detail="Cannot change schedule details with active bookings")
 
@@ -272,12 +269,7 @@ async def delete_schedule(schedule_id: int, db: AsyncSession = Depends(get_db), 
     if not schedule:
         raise HTTPException(status_code=404, detail="Not found")
     
-    statement = select(func.count(Booking.id)).where(
-    Booking.schedule_id == schedule.id,
-    Booking.status == BOOKING_STATUS_BOOKED
-    )
-    result = await db.execute(statement)
-    booked_count = result.scalar()
+    booked_count = await count_active_bookings(db, schedule.id)
 
     if booked_count > 0:
         raise HTTPException(
