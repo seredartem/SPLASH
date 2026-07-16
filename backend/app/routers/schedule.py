@@ -12,7 +12,7 @@ from app.models.trainers import Trainer
 from app.models.class_model import ClassModel
 from app.constants import BOOKING_STATUS_BOOKED
 from datetime import datetime
-from app.services.schedule import count_active_bookings
+from app.services.schedule import count_active_bookings, get_active_class
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -47,24 +47,8 @@ async def add_schedule(schedule_data: ScheduleCreate, db: AsyncSession = Depends
             detail="Cannot create a schedule in the past"
         )        
 
-    statement = select(ClassModel).where(
-    ClassModel.id == schedule_data.class_id
-    )
-    result = await db.execute(statement)
-    class_item = result.scalar_one_or_none()
+    await get_active_class(db, schedule_data.class_id)
 
-    if class_item is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Class not found"
-        )
-
-    if not class_item.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot schedule an inactive class"
-        )
-    
     statement = select(Trainer).where(
     Trainer.id == schedule_data.trainer_id
     )
@@ -171,20 +155,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleUpdate, db: A
             )
     
     if schedule_data.class_id is not None:
-        statement = select(ClassModel).where(
-            ClassModel.id == schedule_data.class_id
-        )
-        result = await db.execute(statement)
-        class_item = result.scalar_one_or_none()
-
-        if class_item is None:
-            raise HTTPException(status_code=404, detail="Class not found")
-
-        if not class_item.is_active:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot schedule an inactive class"
-            )
+        await get_active_class(db, schedule_data.class_id)
     
     if schedule_data.trainer_id is not None:
         statement = select(Trainer).where(
