@@ -20,3 +20,4 @@ class Client(Base):
     marketing_consent = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    

@@ -13,6 +13,9 @@ from app.models.class_model import ClassModel
 from app.models.trainers import Trainer
 from app.models.schedule import Schedule
 from app.models.booking import Booking
+from app.models.family import Family
+from app.models.client import Client
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
